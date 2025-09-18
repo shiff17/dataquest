@@ -51,6 +51,23 @@ uploaded = st.file_uploader("Upload your CSV file", type=["csv"])
 if uploaded:
     df = pd.read_csv(uploaded)
 
+    # Normalize column names to lowercase
+df.columns = [c.strip().lower() for c in df.columns]
+
+# Auto-map synonyms
+rename_map = {}
+if "app" in df.columns: 
+    rename_map["app"] = "software"
+if "program" in df.columns:
+    rename_map["program"] = "software"
+if "ver" in df.columns:
+    rename_map["ver"] = "version"
+if "release" in df.columns:
+    rename_map["release"] = "version"
+
+df.rename(columns=rename_map, inplace=True)
+
+
     # ✅ Show columns for debugging
     st.write("📂 Columns detected:", list(df.columns))
 
