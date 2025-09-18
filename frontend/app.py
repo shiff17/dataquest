@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Proactive Security Patch Automation Framework (Flexible CSV)
-- Accepts ANY CSV (no column constraints)
+Proactive Security Patch Automation Framework (Schema-Free)
+- Accepts ANY CSV (no column restrictions)
 - Cleans nulls
-- Simulates severity/status if missing
+- Auto-generates severity/status if missing
 - RL-based patch prioritization
 - Interactive analytics & visualizations
 """
@@ -14,7 +14,6 @@ import numpy as np
 import plotly.express as px
 import random
 from collections import defaultdict
-from datetime import datetime
 
 # -------------------- RL Patch Prioritizer --------------------
 class PatchPrioritizationRL:
@@ -58,7 +57,7 @@ if page == "Homepage":
         st.subheader("📌 Raw Data")
         st.dataframe(df, use_container_width=True)
 
-        # Assign row IDs if none
+        # Add row IDs if none
         if "id" not in df.columns:
             df.insert(0, "id", range(1, len(df) + 1))
 
@@ -66,15 +65,14 @@ if page == "Homepage":
         before_len = len(df)
         df = df.dropna()
         after_len = len(df)
-
         st.info(f"✅ Cleaned data: {before_len} → {after_len} rows")
 
-        # Simulate severity if missing
+        # Auto-generate severity if missing
         severities = ["Low", "Medium", "High", "Critical"]
         if "severity" not in df.columns:
             df["severity"] = [random.choice(severities) for _ in range(len(df))]
 
-        # Simulate status if missing
+        # Auto-generate status if missing
         if "status" not in df.columns:
             df["status"] = ["Vulnerable" if random.random() > 0.3 else "Safe" for _ in range(len(df))]
 
@@ -107,22 +105,20 @@ elif page == "Analytics":
         if "severity" not in df.columns:
             df["severity"] = [random.choice(["Low", "Medium", "High", "Critical"]) for _ in range(len(df))]
 
-        if "severity" in df.columns:
-            counts = df["severity"].value_counts().reset_index()
-            counts.columns = ["Severity", "Count"]
-            fig = px.bar(counts, x="Severity", y="Count", color="Severity",
-                         title="Vulnerability Severity Distribution")
-            st.plotly_chart(fig, use_container_width=True)
+        counts = df["severity"].value_counts().reset_index()
+        counts.columns = ["Severity", "Count"]
+        fig = px.bar(counts, x="Severity", y="Count", color="Severity",
+                     title="Vulnerability Severity Distribution")
+        st.plotly_chart(fig, use_container_width=True)
 
         if "status" not in df.columns:
             df["status"] = ["Vulnerable" if random.random() > 0.3 else "Safe" for _ in range(len(df))]
 
-        if "status" in df.columns:
-            status_counts = df["status"].value_counts().reset_index()
-            status_counts.columns = ["Status", "Count"]
-            fig2 = px.pie(status_counts, values="Count", names="Status",
-                          title="Vulnerability Status Distribution")
-            st.plotly_chart(fig2, use_container_width=True)
+        status_counts = df["status"].value_counts().reset_index()
+        status_counts.columns = ["Status", "Count"]
+        fig2 = px.pie(status_counts, values="Count", names="Status",
+                      title="Vulnerability Status Distribution")
+        st.plotly_chart(fig2, use_container_width=True)
 
 # -------------------- VISUALIZATION --------------------
 elif page == "Visualization":
