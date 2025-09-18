@@ -1,142 +1,137 @@
-"""
-BOUNTY HUNTERS DASHBOARD
-Streamlit app for Proactive Security Patch Automation Framework.
-Accepts any CSV upload (no schema restrictions).
-Supports multi-row patching + theme toggle + multiple chart options.
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from sklearn.cluster import KMeans
 import numpy as np
-import random
-from datetime import datetime
 
-# ---------------- CONFIG ----------------
-SEVERITY_LEVELS = ["Low", "Medium", "High", "Critical"]
-np.random.seed(42)
-random.seed(42)
-
-# ---------------- HELPERS ----------------
-def apply_patch(df, indices):
-    for idx in indices:
-        df.loc[idx, ["status", "severity", "cve_id", "cvss"]] = ["Safe", "None", "None", None]
-        df.loc[idx, "applied_patch_version"] = "latest"
-    return df
-
-# ---------------- THEME HANDLING ----------------
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"  # default
-
-def set_theme(theme):
-    st.session_state.theme = theme
-
-# Background styling
-if st.session_state.theme == "light":
-    bg_color = "#e0f2fe"  # light blue
-else:
-    bg_color = "#1e3a8a"  # dark blue
-
-st.markdown(
-    f"""
-    <style>
-    body {{
-        background-color: {bg_color};
-    }}
-    .big-title {{
-        font-size: 50px;
-        font-weight: 900;
-        text-align: center;
-        color: white;
-        margin-bottom: 20px;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True,
+# -------------------- NAVIGATION --------------------
+st.sidebar.title("🛡 Proactive Patch Automation")
+page = st.sidebar.radio(
+    "Navigate",
+    ["Homepage", "Analytics", "Visualization"]
 )
 
-# ---------------- TOP NAV BAR ----------------
-col1, col2 = st.columns([10, 1])
-with col1:
-    st.markdown(
-        '<div class="big-title"> 🛡⚔ BOUNTY HUNTERS DASHBOARD ⚔🛡</div>',
-        unsafe_allow_html=True,
-    )
-with col2:
-    if st.button("🌙" if st.session_state.theme == "light" else "☀"):
-        set_theme("dark" if st.session_state.theme == "light" else "light")
-        st.experimental_rerun()
+# -------------------- HOMEPAGE --------------------
+if page == "Homepage":
+    st.title("🛡 Proactive Self-Healing Patch Dashboard")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
 
-# ---------------- APP BODY ----------------
-uploaded = st.file_uploader("📂 Upload any CSV file", type=["csv"])
+    if uploaded:
+        df = pd.read_csv(uploaded)
 
-if uploaded:
-    df = pd.read_csv(uploaded)
+        st.subheader("📌 Raw Data (Before Cleaning)")
+        st.dataframe(df, use_container_width=True)
 
-    # Ensure unique identifier
-    if "id" not in df.columns:
-        df.insert(0, "id", range(1, len(df) + 1))
+        # Save before data snapshot
+        before_snapshot = df.copy()
 
-    # ---- SIMULATE VULNERABILITY DATA ----
-    df["cve_id"] = [f"CVE-{random.randint(1000,9999)}" for _ in range(len(df))]
-    df["cvss"] = np.round(np.random.uniform(2, 9, size=len(df)), 1)
-    df["severity"] = df["cvss"].apply(lambda x: SEVERITY_LEVELS[int(x//3)])
-    df["patch_recommendation"] = "Update to latest"
-    df["status"] = "Vulnerable"
-    df["applied_patch_version"] = None
-    df["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        # Clean null values
+        df = df.dropna()
 
-    # ---- DISPLAY TABLE ----
-    st.subheader("📋 Detected Vulnerabilities")
-    st.dataframe(df, use_container_width=True)
+        # Clustering example (assume severity numeric mapping)
+        if "severity" in df.columns:
+            sev_map = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+            df["severity_num"] = df["severity"].map(sev_map).fillna(0)
 
-    # ---- CHART OPTIONS ----
-    st.subheader("📊 Visualize Vulnerabilities")
-    chart_type = st.selectbox("Choose chart type", ["Bar", "Pie", "Scatter", "Line", "Heatmap"])
+            # Simple clustering
+            km = KMeans(n_clusters=2, random_state=42, n_init=10)
+            df["cluster"] = km.fit_predict(df[["severity_num"]])
 
-    if chart_type == "Bar":
-        counts = df["severity"].value_counts().reset_index()
-        counts.columns = ["Severity", "Count"]
-        fig = px.bar(counts, x="Severity", y="Count", color="Severity", title="Severity Distribution")
-        st.plotly_chart(fig, use_container_width=True)
+        # Simulate patching — mark vulnerable as safe
+        if "status" in df.columns:
+            df["status"] = df["status"].replace("Vulnerable", "Safe")
 
-    elif chart_type == "Pie":
-        counts = df["severity"].value_counts().reset_index()
-        counts.columns = ["Severity", "Count"]
-        fig = px.pie(counts, values="Count", names="Severity", title="Severity Breakdown")
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("✨ Processed Data (After Cleaning & Self-Healing)")
+        st.dataframe(df, use_container_width=True)
 
-    elif chart_type == "Scatter":
-        fig = px.scatter(df, x="id", y="cvss", color="severity",
-                         hover_data=["cve_id", "status"],
-                         title="CVSS Scores by ID")
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif chart_type == "Line":
-        fig = px.line(df, x="id", y="cvss", color="severity",
-                      markers=True, title="CVSS Trend by ID")
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif chart_type == "Heatmap":
-        pivot = pd.crosstab(df["severity"], df["status"])
-        fig = px.imshow(pivot, text_auto=True, color_continuous_scale="Blues",
-                        title="Severity vs Status Heatmap")
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ---- SUMMARY ----
-    st.subheader("📌 Vulnerability Summary")
-    summary = df["severity"].value_counts().to_dict()
-    for sev, count in summary.items():
-        st.write(f"{sev}: {count}")
-
-    # ---- PATCH SIMULATION ----
-    st.subheader("🛠 Simulate Patch")
-    vuln_indices = df[df["status"] == "Vulnerable"].index.tolist()
-    if vuln_indices:
-        selected = st.multiselect("Select rows to patch", vuln_indices)
-        if st.button("Apply Patch"):
-            df = apply_patch(df, selected)
-            st.success(f"✅ Patched {len(selected)} row(s)")
+        # Compare before vs after
+        st.subheader("🔍 Before vs After")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Before**")
+            st.dataframe(before_snapshot, use_container_width=True)
+        with col2:
+            st.write("**After**")
             st.dataframe(df, use_container_width=True)
-else:
-    st.info("📥 Please upload a CSV file to continue.")
+
+# -------------------- ANALYTICS --------------------
+elif page == "Analytics":
+    st.title("📊 Dataset Analytics & Recommendations")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
+
+    if uploaded:
+        df = pd.read_csv(uploaded).dropna()
+
+        st.subheader("Summary Statistics")
+        st.write(df.describe(include="all"))
+
+        if "severity" in df.columns:
+            counts = df["severity"].value_counts()
+            st.write("### Vulnerability Severity Distribution")
+            st.bar_chart(counts)
+
+        if "status" in df.columns:
+            vuln_rate = (df["status"] == "Vulnerable").mean() * 100
+            st.write(f"⚠️ Vulnerable Systems: {vuln_rate:.2f}%")
+
+        st.subheader("Recommendations")
+        if "severity" in df.columns and "status" in df.columns:
+            if vuln_rate > 20:
+                st.error("High vulnerability detected! Immediate patching recommended.")
+            else:
+                st.success("System health looks stable. Continue monitoring weekly.")
+        else:
+            st.info("Upload CSV with 'severity' and 'status' columns for full analytics.")
+
+# -------------------- VISUALIZATION --------------------
+elif page == "Visualization":
+    st.title("📈 Before & After Visualization")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
+
+    if uploaded:
+        df = pd.read_csv(uploaded).dropna()
+        before_df = df.copy()
+
+        # Map severity to numbers
+        if "severity" in df.columns:
+            sev_map = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+            df["severity_num"] = df["severity"].map(sev_map).fillna(0)
+
+        # After patch: mark all safe
+        if "status" in df.columns:
+            df["status"] = df["status"].replace("Vulnerable", "Safe")
+
+        vis_type = st.selectbox(
+            "Choose visualization",
+            ["Bar Chart", "Scatter Plot", "Pie Chart"]
+        )
+
+        if vis_type == "Bar Chart" and "severity" in before_df.columns:
+            before_counts = before_df["severity"].value_counts().reset_index()
+            before_counts.columns = ["Severity", "Count"]
+
+            after_counts = df["severity"].value_counts().reset_index()
+            after_counts.columns = ["Severity", "Count"]
+
+            fig_before = px.bar(before_counts, x="Severity", y="Count", title="Before Patching")
+            fig_after = px.bar(after_counts, x="Severity", y="Count", title="After Patching")
+
+            st.plotly_chart(fig_before, use_container_width=True)
+            st.plotly_chart(fig_after, use_container_width=True)
+
+        elif vis_type == "Scatter Plot" and "severity_num" in df.columns:
+            fig = px.scatter(df, x=np.arange(len(df)), y="severity_num", color="status",
+                             title="Scatter of Vulnerabilities Before/After")
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif vis_type == "Pie Chart" and "status" in df.columns:
+            before_status = before_df["status"].value_counts().reset_index()
+            before_status.columns = ["Status", "Count"]
+            after_status = df["status"].value_counts().reset_index()
+            after_status.columns = ["Status", "Count"]
+
+            fig1 = px.pie(before_status, values="Count", names="Status", title="Before Patching")
+            fig2 = px.pie(after_status, values="Count", names="Status", title="After Patching")
+
+            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig2, use_container_width=True)
