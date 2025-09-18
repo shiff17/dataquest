@@ -59,7 +59,7 @@ st.markdown(
 col1, col2 = st.columns([10, 1])
 with col1:
     st.markdown(
-        '<div class="big-title">🎯🔥 BOUNTY HUNTERS DASHBOARD 🛡⚔</div>',
+        '<div class="big-title"> 🛡⚔ BOUNTY HUNTERS DASHBOARD ⚔🛡</div>',
         unsafe_allow_html=True,
     )
 with col2:
