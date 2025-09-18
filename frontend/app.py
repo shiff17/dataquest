@@ -1,9 +1,3 @@
-"""
-Streamlit frontend for Proactive Security Patch Automation Framework.
-Accepts any CSV upload (no schema restrictions).
-Supports multi-row patching.
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -23,9 +17,45 @@ def apply_patch(df, indices):
         df.loc[idx, "applied_patch_version"] = "latest"
     return df
 
-# ---------------- STREAMLIT APP ----------------
-st.title("🛡 Proactive Security Patch Automation Dashboard")
+# ---------------- NAVBAR & THEME ----------------
+st.markdown(
+    """
+    <style>
+    /* Navbar */
+    .top-bar {
+        background-color: #2563eb; /* blue */
+        color: white;
+        padding: 10px 20px;
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .dark-mode .top-bar {
+        background-color: #1e3a8a; /* darker blue */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
+# Toggle for dark/light
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+col1, col2 = st.columns([10, 1])
+with col1:
+    st.markdown('<div class="top-bar">🛡 Proactive Security Patch Automation Dashboard</div>', unsafe_allow_html=True)
+with col2:
+    if st.button("🌙" if not st.session_state.dark_mode else "☀"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        mode = "dark-mode" if st.session_state.dark_mode else ""
+        st.markdown(f"<body class='{mode}'>", unsafe_allow_html=True)
+
+# ---------------- STREAMLIT APP ----------------
 uploaded = st.file_uploader("Upload any CSV file", type=["csv"])
 
 if uploaded:
@@ -53,6 +83,11 @@ if uploaded:
     counts.columns = ["Severity", "Count"]
     fig = px.bar(counts, x="Severity", y="Count", color="Severity")
     st.plotly_chart(fig, use_container_width=True)
+
+    # ---- SUMMARY ----
+    st.subheader("Vulnerability Summary")
+    for _, row in counts.iterrows():
+        st.write(f"{row['Severity']}: {row['Count']}")
 
     # ---- PATCH SIMULATION ----
     st.subheader("Simulate Patch")
