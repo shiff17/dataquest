@@ -73,6 +73,7 @@ if page == "Homepage":
 
             fig = px.line(combined, x="Severity", y="Count", color="Type", markers=True,
                           title="Before vs After - Severity Distribution")
+            fig.update_traces(text=combined["Count"], textposition="top center")
             st.plotly_chart(fig, use_container_width=True)
 
 # -------------------- ANALYTICS --------------------
@@ -100,10 +101,13 @@ elif page == "Analytics":
             """
         )
 
+        # Severity distribution with proper chart
         if "severity" in df.columns:
-            counts = df["severity"].value_counts()
-            st.write("### Vulnerability Severity Distribution")
-            st.bar_chart(counts)
+            counts = df["severity"].value_counts().reset_index()
+            counts.columns = ["Severity", "Count"]
+            fig = px.bar(counts, x="Severity", y="Count", color="Severity",
+                         title="Vulnerability Severity Distribution", text="Count")
+            st.plotly_chart(fig, use_container_width=True)
 
         vuln_rate = None
         if "status" in df.columns:
@@ -128,7 +132,9 @@ elif page == "Analytics":
                 recs.append("🚨 Ensure High severity issues are patched within 72 hours.")
 
         recs.append("📊 Establish continuous monitoring to detect new threats early.")
+        recs.append("🔐 Enforce stricter access control & regular audits for sensitive systems.")
 
+        # Ensure at least 3–5 recommendations
         for r in recs[:5]:
             st.write("-", r)
 
@@ -162,9 +168,9 @@ elif page == "Visualization":
             after_counts.columns = ["Severity", "Count"]
 
             fig_before = px.bar(before_counts, x="Severity", y="Count", title="Before Patching",
-                                text="Count")
+                                text="Count", color="Severity")
             fig_after = px.bar(after_counts, x="Severity", y="Count", title="After Patching",
-                               text="Count")
+                               text="Count", color="Severity")
 
             st.plotly_chart(fig_before, use_container_width=True)
             st.plotly_chart(fig_after, use_container_width=True)
