@@ -1,174 +1,163 @@
 #!/usr/bin/env python3
 """
-Proactive Security Patch Automation Framework - Enhanced Backend
-Hackathon Ready: ML + RL + EDA + CSV/JSON Output
+Proactive Security Patch Automation Framework
+User-upload CSV → EDA → RL-based Patch Prioritization → Visualizations
 """
 
-import os, time, json, random, logging, warnings
-import requests, concurrent.futures
-import numpy as np
+import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.express as px
+import random
+from collections import defaultdict
 from datetime import datetime
-from collections import defaultdict, deque
-from typing import Dict, List, Any
 
-warnings.filterwarnings("ignore")
+# -------------------- RL Patch Prioritizer --------------------
+class PatchPrioritizationRL:
+    def _init_(self, epsilon=0.1):
+        self.epsilon = epsilon
+        self.q_table = defaultdict(lambda: defaultdict(float))
 
-# ---------------- CONFIG ----------------
-API_TIMEOUT = 15
-MAX_THREADS = 5
-CSV_FILENAME = "vulnerability_scan_results.csv"
-JSON_FILENAME = "vulnerability_scan_results.json"
+    def choose_action(self, severity):
+        actions = ["patch_now", "schedule", "defer"]
+        if random.random() < self.epsilon:
+            return random.choice(actions)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%H:%M:%S"
-)
+        if severity == "Critical":
+            return "patch_now"
+        elif severity == "High":
+            return "schedule"
+        else:
+            return "defer"
 
-# Import ML/EDA classes from your existing code
-# (Keeping them unchanged but reused here)
-# VulnerabilityEDA, PatchPrioritizationRL, EnhancedCVEChecker
-
-# ============================================================================
-# ENHANCED SECURITY SCANNER
-# ============================================================================
-
-class EnhancedSecurityScanner:
-    """Main security scanner with EDA and RL capabilities"""
-
-    def _init_(self):
-        self.cve_checker = EnhancedCVEChecker()
-        self.eda_engine = VulnerabilityEDA()
-        self.rl_agent = PatchPrioritizationRL()
-        self.results: List[Dict] = []
-
-    def run_scan(self) -> Tuple[str, str]:
-        """Run full security scan and return (CSV, JSON)"""
-        logging.info("🛡 Starting Enhanced Proactive Security Scan")
-
-        # STEP 1: Simulate installed software
-        software = SAMPLE_INSTALLED_SOFTWARE
-        logging.info(f"📦 Detected {len(software)} installed packages")
-
-        # STEP 2: Parallel vulnerability check
-        self.results = self._parallel_vulnerability_checks(software)
-
-        # STEP 3: EDA
-        eda_results = self.eda_engine.analyze_vulnerability_patterns(self.results)
-
-        # STEP 4: RL recommendations
-        rl_recs = self.rl_agent.get_patch_recommendations(self.results)
-
-        # STEP 5: Save outputs
-        csv_file = self._save_csv(self.results, rl_recs)
-        json_file = self._save_json(self.results, rl_recs, eda_results)
-
-        # STEP 6: Print summary
-        self._summary(self.results, rl_recs)
-
-        return csv_file, json_file
-
-    def _parallel_vulnerability_checks(self, software: Dict) -> List[Dict]:
-        """Run vulnerability checks in parallel threads"""
-        logging.info("⚡ Checking vulnerabilities (parallel mode)...")
-
-        results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-            futures = {
-                executor.submit(self.cve_checker.enhanced_vulnerability_check, sw, meta["version"], meta): (sw, meta)
-                for sw, meta in software.items()
-            }
-
-            for future in concurrent.futures.as_completed(futures):
-                sw, meta = futures[future]
-                try:
-                    cve_info = future.result()
-                    result = self._format_result(sw, meta, cve_info)
-                    results.append(result)
-                    logging.info(f"✅ {sw}: {cve_info['severity']} ({cve_info['cve_id']})")
-                except Exception as e:
-                    logging.error(f"❌ Error scanning {sw}: {e}")
-
-        return results
-
-    def _format_result(self, sw: str, meta: Dict, cve_info: Dict) -> Dict:
-        """Format result dict with metadata + CVE info"""
+    def recommend(self, row):
+        action = self.choose_action(row.get("severity", "Low"))
         return {
-            "software": sw,
-            "version": meta["version"],
-            "cve_id": cve_info.get("cve_id", "None"),
-            "severity": cve_info.get("severity", "None"),
-            "cvss_score": cve_info.get("cvss_score", 0),
-            "ml_risk_score": cve_info.get("ml_risk_score", 0),
-            "confidence_level": cve_info.get("confidence_level", 0.7),
-            "description": cve_info.get("description", "N/A"),
-            "status": "Vulnerable" if cve_info.get("severity") != "None" else "Safe",
-            "scan_date": datetime.utcnow().isoformat(),
-            "category": meta.get("category"),
-            "criticality": meta.get("criticality"),
-            "exposure": meta.get("exposure"),
-            "users_affected": meta.get("users"),
-            "uptime_requirement": meta.get("uptime_requirement"),
+            "software": row.get("software", "Unknown"),
+            "cve_id": row.get("cve_id", "None"),
+            "severity": row.get("severity", "Low"),
+            "recommendation": action
         }
 
-    def _save_csv(self, results: List[Dict], rl_recs: List[Dict]) -> str:
-        """Save results to CSV"""
-        df = pd.DataFrame(results)
+# -------------------- Streamlit UI --------------------
+st.set_page_config(page_title="🛡 Proactive Patch Automation", layout="wide")
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Homepage", "Analytics", "Visualization"])
 
-        # Attach RL recs if available
-        rl_map = {r["software"]: r for r in rl_recs}
-        df["rl_action"] = df["software"].map(lambda x: rl_map.get(x, {}).get("recommended_action", "monitor"))
-        df["priority_score"] = df["software"].map(lambda x: rl_map.get(x, {}).get("priority_score", 0))
-        df["ai_confidence"] = df["software"].map(lambda x: rl_map.get(x, {}).get("confidence", 0))
+# -------------------- HOMEPAGE --------------------
+if page == "Homepage":
+    st.title("🛡 Proactive Self-Healing Patch Dashboard")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
 
-        df.to_csv(CSV_FILENAME, index=False)
-        logging.info(f"💾 CSV saved: {CSV_FILENAME} ({len(df)} rows)")
-        return CSV_FILENAME
+    if uploaded:
+        df = pd.read_csv(uploaded)
 
-    def _save_json(self, results: List[Dict], rl_recs: List[Dict], eda: Dict) -> str:
-        """Save results + recs + EDA into JSON"""
-        output = {
-            "scan_time": datetime.utcnow().isoformat(),
-            "results": results,
-            "rl_recommendations": rl_recs,
-            "eda_summary": eda,
-        }
-        with open(JSON_FILENAME, "w") as f:
-            json.dump(output, f, indent=2)
-        logging.info(f"💾 JSON saved: {JSON_FILENAME}")
-        return JSON_FILENAME
+        # Ensure required columns exist
+        required_cols = {"software", "version"}
+        if not required_cols.issubset(df.columns):
+            st.error(f"❌ CSV must contain at least these columns: {required_cols}")
+        else:
+            st.subheader("📌 Raw Data")
+            st.dataframe(df, use_container_width=True)
 
-    def _summary(self, results: List[Dict], rl_recs: List[Dict]):
-        """ASCII summary for hackathon demo"""
-        total = len(results)
-        vuln = sum(1 for r in results if r["status"] == "Vulnerable")
-        safe = total - vuln
-        logging.info("=" * 50)
-        logging.info(f"📊 SCAN SUMMARY: {total} total | 🚨 {vuln} vulnerable | ✅ {safe} safe")
-        logging.info(f"🎯 Top Recommendation: {rl_recs[0]['software']} → {rl_recs[0]['recommended_action']}")
-        logging.info("=" * 50)
+            # Clean data
+            before_len = len(df)
+            df = df.dropna()
+            after_len = len(df)
 
+            st.info(f"✅ Cleaned data: {before_len} → {after_len} rows")
 
-# ============================================================================
-# MAIN
-# ============================================================================
+            # RL recommendations
+            rl_agent = PatchPrioritizationRL()
+            recs = [rl_agent.recommend(row) for _, row in df.iterrows()]
+            rec_df = pd.DataFrame(recs)
 
-def main():
-    scanner = EnhancedSecurityScanner()
-    csv_file, json_file = scanner.run_scan()
+            st.subheader("🤖 Patch Recommendations")
+            st.dataframe(rec_df, use_container_width=True)
 
-    # Colab auto-download
-    try:
-        from google.colab import files
-        files.download(csv_file)
-        files.download(json_file)
-    except ImportError:
-        logging.info("📥 Files ready locally: CSV + JSON")
+            st.download_button(
+                label="📥 Download Processed Data",
+                data=rec_df.to_csv(index=False),
+                file_name="patch_recommendations.csv",
+                mime="text/csv"
+            )
 
-    return csv_file, json_file
+# -------------------- ANALYTICS --------------------
+elif page == "Analytics":
+    st.title("📊 Dataset Analytics")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
 
+    if uploaded:
+        df = pd.read_csv(uploaded).dropna()
 
-if _name_ == "_main_":
-    logging.info("🚀 Launching Enhanced Backend (Hackathon Mode)")
-    main()
+        st.subheader("Summary Statistics")
+        st.write(df.describe(include="all"))
+
+        if "severity" in df.columns:
+            counts = df["severity"].value_counts().reset_index()
+            counts.columns = ["Severity", "Count"]
+            fig = px.bar(counts, x="Severity", y="Count", color="Severity",
+                         title="Vulnerability Severity Distribution")
+            st.plotly_chart(fig, use_container_width=True)
+
+        if "status" in df.columns:
+            status_counts = df["status"].value_counts().reset_index()
+            status_counts.columns = ["Status", "Count"]
+            fig2 = px.pie(status_counts, values="Count", names="Status",
+                          title="Vulnerability Status Distribution")
+            st.plotly_chart(fig2, use_container_width=True)
+
+# -------------------- VISUALIZATION --------------------
+elif page == "Visualization":
+    st.title("📈 Before & After Visualization")
+    uploaded = st.file_uploader("Upload your vulnerability scan (CSV)", type=["csv"])
+
+    if uploaded:
+        df = pd.read_csv(uploaded).dropna()
+        before_df = df.copy()
+
+        # Simulate patching
+        if "status" in df.columns:
+            df["status"] = df["status"].replace("Vulnerable", "Safe")
+
+        vis_type = st.selectbox(
+            "Choose visualization",
+            ["Severity (Bar)", "Severity (Line)", "Vulnerability Status (Pie)", "Scatter Severity"]
+        )
+
+        if vis_type == "Severity (Bar)" and "severity" in before_df.columns:
+            before_counts = before_df["severity"].value_counts().reset_index()
+            after_counts = df["severity"].value_counts().reset_index()
+            before_counts.columns, after_counts.columns = ["Severity", "Count"], ["Severity", "Count"]
+            before_counts["Type"], after_counts["Type"] = "Before", "After"
+            combined = pd.concat([before_counts, after_counts])
+            fig = px.bar(combined, x="Severity", y="Count", color="Type", barmode="group",
+                         title="Before vs After - Severity Levels")
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif vis_type == "Severity (Line)" and "severity" in before_df.columns:
+            before_counts = before_df["severity"].value_counts().reset_index()
+            after_counts = df["severity"].value_counts().reset_index()
+            before_counts.columns, after_counts.columns = ["Severity", "Count"], ["Severity", "Count"]
+            before_counts["Type"], after_counts["Type"] = "Before", "After"
+            combined = pd.concat([before_counts, after_counts])
+            fig = px.line(combined, x="Severity", y="Count", color="Type", markers=True,
+                          title="Before vs After - Severity Trend")
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif vis_type == "Vulnerability Status (Pie)" and "status" in before_df.columns:
+            before_status = before_df["status"].value_counts().reset_index()
+            after_status = df["status"].value_counts().reset_index()
+            before_status.columns, after_status.columns = ["Status", "Count"], ["Status", "Count"]
+            fig1 = px.pie(before_status, values="Count", names="Status", title="Before Patching")
+            fig2 = px.pie(after_status, values="Count", names="Status", title="After Patching")
+            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig2, use_container_width=True)
+
+        elif vis_type == "Scatter Severity" and "severity" in df.columns:
+            sev_map = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+            df["severity_num"] = df["severity"].map(sev_map).fillna(0)
+            fig = px.scatter(df, x=np.arange(len(df)), y="severity_num", color="status",
+                             title="Scatter of Vulnerabilities After Cleaning",
+                             labels={"severity_num": "Severity Level"})
+            st.plotly_chart(fig, use_container_width=True)
