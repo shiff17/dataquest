@@ -1,0 +1,172 @@
+/* ---------------- GLOBAL ---------------- */
+body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* ---------------- TITLE ---------------- */
+.centered-title {
+    text-align: center;
+    font-size: 64px;
+    font-weight: 800;
+    margin: 10px auto 30px auto;
+    color: var(--primary-color);
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+/* ---------------- NAVIGATION BAR ---------------- */
+.topnav {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+.topnav button {
+    background: linear-gradient(45deg, var(--primary-color), #66ccff);
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    color: white;
+    font-size: 18px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+.topnav button:hover {
+    transform: scale(1.07);
+    background: linear-gradient(45deg, #ffcc00, var(--primary-color));
+}
+
+/* ---------------- THEME TOGGLE ---------------- */
+.toggle-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(45deg, var(--primary-color), #66ccff);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+.toggle-btn:hover {
+    transform: scale(1.05);
+    background: linear-gradient(45deg, #ffcc00, var(--primary-color));
+}
+
+/* ---------------- SIDEBAR ---------------- */
+[data-testid="stSidebar"] {
+    background: var(--sidebar-bg);
+    color: var(--text-color);
+}
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+/* ---------------- EXPANDERS ---------------- */
+.streamlit-expanderHeader {
+    background: var(--primary-color);
+    color: white !important;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 8px 16px;
+}
+
+/* ---------------- TABLES ---------------- */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 20px 0;
+}
+th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 700;
+    padding: 10px;
+    text-align: center;
+}
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+    text-align: center;
+}
+
+/* ---------------- METRICS ---------------- */
+div[data-testid="stMetricValue"] {
+    color: var(--primary-color);
+    font-size: 26px;
+    font-weight: bold;
+}
+div[data-testid="stMetricDelta"] {
+    font-size: 14px;
+    font-weight: 600;
+}
+.stMetric {
+    border-radius: 10px;
+    padding: 12px;
+    background: var(--metric-bg);
+    margin: 8px;
+}
+
+/* ---------------- UPLOAD BOX ---------------- */
+section[data-testid="stFileUploader"] {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 3px dashed var(--primary-color);
+    border-radius: 15px;
+    padding: 30px;
+    background: var(--upload-bg);
+    transition: all 0.3s ease;
+}
+section[data-testid="stFileUploader"]:hover {
+    transform: scale(1.03);
+    border-color: #ffcc00;
+    background: var(--upload-hover-bg);
+}
+
+/* ---------------- BUTTONS ---------------- */
+div.stButton > button {
+    background: linear-gradient(45deg, var(--primary-color), #66ccff);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+div.stButton > button:hover {
+    transform: scale(1.08);
+    background: linear-gradient(45deg, #ffcc00, var(--primary-color));
+}
+
+/* ---------------- ANIMATIONS ---------------- */
+.pulse {
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+with open("ui.css") as f:
+    css = f.read()
+
+# Replace CSS variables dynamically from Python
+css = css.replace("--primary-color", primary_color)\
+         .replace("--sidebar-bg", "#e6f2ff" if theme=="light" else "#0d1a33")\
+         .replace("--text-color", text_color)\
+         .replace("--metric-bg", "#f0f8ff" if theme=="light" else "#1a2a4d")\
+         .replace("--upload-bg", "#f0faff" if theme=="light" else "#102040")\
+         .replace("--upload-hover-bg", "#e6f2ff" if theme=="light" else "#1a2a4d")
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
