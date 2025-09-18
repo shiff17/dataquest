@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
 Proactive Security Patch Automation Dashboard
-- Streamlit frontend + simplified backend
-- Accepts only CSV uploads
+- CSV only
 - Requires 'software' and 'version' columns
 - Auto-fills severity/status if missing
-- Supports patch simulation + simple analytics
 """
 
 import streamlit as st
@@ -53,48 +51,60 @@ uploaded = st.file_uploader("Upload your CSV file", type=["csv"])
 if uploaded:
     df = pd.read_csv(uploaded)
 
+    # ✅ Show columns for debugging
+    st.write("📂 Columns detected:", list(df.columns))
+
     # ✅ Ensure required columns
     required = {"software", "version"}
     if not required.issubset(df.columns):
         st.error(f"❌ CSV must contain at least these columns: {required}")
+        st.stop()
+
+    # Add ID if missing
+    if "id" not in df.columns:
+        df.insert(0, "id", range(1, len(df) + 1))
+
+    # Fill missing fields
+    df = generate_random_vulns(df)
+
+    # Show data
+    st.subheader("📊 Uploaded Data")
+    st.dataframe(df, use_container_width=True)
+
+    # Show security score
+    score = security_score(df)
+    st.metric("🔐 Security Score", f"{score}/100")
+
+    # Severity chart
+    counts = df["severity"].value_counts().reset_index()
+    counts.columns = ["Severity", "Count"]
+    fig = px.bar(counts, x="Severity", y="Count", color="Severity",
+                 title="Vulnerabilities by Severity")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Patch simulation
+    st.subheader("🩹 Simulate Patch")
+    vuln_rows = df[df["status"] == "Vulnerable"]
+    if not vuln_rows.empty:
+        selected = st.multiselect("Select software to patch", vuln_rows["software"].tolist())
+        if st.button("Apply Patch"):
+            df = apply_patch(df, selected)
+            st.success(f"✅ Patched {len(selected)} item(s)")
+            st.dataframe(df, use_container_width=True)
+
+            # Recalculate score
+            score = security_score(df)
+            st.metric("🔐 Updated Security Score", f"{score}/100")
+
+            # ✅ Download patched results
+            st.download_button(
+                "📥 Download Patched CSV",
+                df.to_csv(index=False),
+                file_name="patched_results.csv",
+                mime="text/csv"
+            )
     else:
-        # Add ID if missing
-        if "id" not in df.columns:
-            df.insert(0, "id", range(1, len(df) + 1))
-
-        # Fill missing fields
-        df = generate_random_vulns(df)
-
-        # Show data
-        st.subheader("📊 Uploaded Data")
-        st.dataframe(df, use_container_width=True)
-
-        # Show security score
-        score = security_score(df)
-        st.metric("🔐 Security Score", f"{score}/100")
-
-        # Severity chart
-        counts = df["severity"].value_counts().reset_index()
-        counts.columns = ["Severity", "Count"]
-        fig = px.bar(counts, x="Severity", y="Count", color="Severity",
-                     title="Vulnerabilities by Severity")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Patch simulation
-        st.subheader("🩹 Simulate Patch")
-        vuln_rows = df[df["status"] == "Vulnerable"]
-        if not vuln_rows.empty:
-            selected = st.multiselect("Select software to patch", vuln_rows["software"].tolist())
-            if st.button("Apply Patch"):
-                df = apply_patch(df, selected)
-                st.success(f"✅ Patched {len(selected)} item(s)")
-                st.dataframe(df, use_container_width=True)
-
-                # Recalculate score
-                score = security_score(df)
-                st.metric("🔐 Updated Security Score", f"{score}/100")
-        else:
-            st.info("🎉 All software is already safe!")
+        st.info("🎉 All software is already safe!")
 
 else:
     st.info("Please upload a CSV file to continue.")
