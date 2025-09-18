@@ -51,21 +51,29 @@ uploaded = st.file_uploader("Upload your CSV file", type=["csv"])
 if uploaded:
     df = pd.read_csv(uploaded)
 
-    # Normalize column names to lowercase
-df.columns = [c.strip().lower() for c in df.columns]
+    # --- Normalize column names ---
+    df.columns = [c.strip().lower() for c in df.columns]
 
-# Auto-map synonyms
-rename_map = {}
-if "app" in df.columns: 
-    rename_map["app"] = "software"
-if "program" in df.columns:
-    rename_map["program"] = "software"
-if "ver" in df.columns:
-    rename_map["ver"] = "version"
-if "release" in df.columns:
-    rename_map["release"] = "version"
+    # --- Auto-map synonyms to required names ---
+    rename_map = {
+        "app": "software",
+        "program": "software",
+        "application": "software",
+        "ver": "version",
+        "release": "version",
+        "v": "version"
+    }
+    for col, target in rename_map.items():
+        if col in df.columns and target not in df.columns:
+            df.rename(columns={col: target}, inplace=True)
 
-df.rename(columns=rename_map, inplace=True)
+    # --- Check again after mapping ---
+    required = {"software", "version"}
+    if not required.issubset(df.columns):
+        st.error(f"❌ CSV must contain at least these columns: {required}")
+    else:
+        st.success("✅ CSV looks good! Both 'software' and 'version' found.")
+        st.dataframe(df, use_container_width=True)
 
 
     # ✅ Show columns for debugging
