@@ -1,3 +1,10 @@
+"""
+BOUNTY HUNTERS DASHBOARD
+Streamlit app for Proactive Security Patch Automation Framework.
+Accepts any CSV upload (no schema restrictions).
+Supports multi-row patching + theme toggle + multiple chart options.
+"""
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -17,51 +24,56 @@ def apply_patch(df, indices):
         df.loc[idx, "applied_patch_version"] = "latest"
     return df
 
-# ---------------- NAVBAR & THEME ----------------
+# ---------------- THEME HANDLING ----------------
+if "theme" not in st.session_state:
+    st.session_state.theme = "light"  # default
+
+def set_theme(theme):
+    st.session_state.theme = theme
+
+# Background styling
+if st.session_state.theme == "light":
+    bg_color = "#e0f2fe"  # light blue
+else:
+    bg_color = "#1e3a8a"  # dark blue
+
 st.markdown(
-    """
+    f"""
     <style>
-    /* Navbar */
-    .top-bar {
-        background-color: #2563eb; /* blue */
+    body {{
+        background-color: {bg_color};
+    }}
+    .big-title {{
+        font-size: 50px;
+        font-weight: 900;
+        text-align: center;
         color: white;
-        padding: 10px 20px;
-        font-size: 20px;
-        font-weight: 600;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-radius: 8px;
-        margin-bottom: 15px;
-    }
-    .dark-mode .top-bar {
-        background-color: #1e3a8a; /* darker blue */
-    }
+        margin-bottom: 20px;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Toggle for dark/light
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-
+# ---------------- TOP NAV BAR ----------------
 col1, col2 = st.columns([10, 1])
 with col1:
-    st.markdown('<div class="top-bar">🛡 Proactive Security Patch Automation Dashboard</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="big-title">🎯🔥 BOUNTY HUNTERS DASHBOARD 🛡⚔</div>',
+        unsafe_allow_html=True,
+    )
 with col2:
-    if st.button("🌙" if not st.session_state.dark_mode else "☀"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        mode = "dark-mode" if st.session_state.dark_mode else ""
-        st.markdown(f"<body class='{mode}'>", unsafe_allow_html=True)
+    if st.button("🌙" if st.session_state.theme == "light" else "☀"):
+        set_theme("dark" if st.session_state.theme == "light" else "light")
+        st.experimental_rerun()
 
-# ---------------- STREAMLIT APP ----------------
-uploaded = st.file_uploader("Upload any CSV file", type=["csv"])
+# ---------------- APP BODY ----------------
+uploaded = st.file_uploader("📂 Upload any CSV file", type=["csv"])
 
 if uploaded:
     df = pd.read_csv(uploaded)
 
-    # Ensure unique identifier column exists
+    # Ensure unique identifier
     if "id" not in df.columns:
         df.insert(0, "id", range(1, len(df) + 1))
 
@@ -75,28 +87,56 @@ if uploaded:
     df["timestamp"] = datetime.utcnow().isoformat() + "Z"
 
     # ---- DISPLAY TABLE ----
-    st.subheader("Detected Vulnerabilities")
+    st.subheader("📋 Detected Vulnerabilities")
     st.dataframe(df, use_container_width=True)
 
-    # ---- CHART ----
-    counts = df["severity"].value_counts().reset_index()
-    counts.columns = ["Severity", "Count"]
-    fig = px.bar(counts, x="Severity", y="Count", color="Severity")
-    st.plotly_chart(fig, use_container_width=True)
+    # ---- CHART OPTIONS ----
+    st.subheader("📊 Visualize Vulnerabilities")
+    chart_type = st.selectbox("Choose chart type", ["Bar", "Pie", "Scatter", "Line", "Heatmap"])
+
+    if chart_type == "Bar":
+        counts = df["severity"].value_counts().reset_index()
+        counts.columns = ["Severity", "Count"]
+        fig = px.bar(counts, x="Severity", y="Count", color="Severity", title="Severity Distribution")
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "Pie":
+        counts = df["severity"].value_counts().reset_index()
+        counts.columns = ["Severity", "Count"]
+        fig = px.pie(counts, values="Count", names="Severity", title="Severity Breakdown")
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "Scatter":
+        fig = px.scatter(df, x="id", y="cvss", color="severity",
+                         hover_data=["cve_id", "status"],
+                         title="CVSS Scores by ID")
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "Line":
+        fig = px.line(df, x="id", y="cvss", color="severity",
+                      markers=True, title="CVSS Trend by ID")
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "Heatmap":
+        pivot = pd.crosstab(df["severity"], df["status"])
+        fig = px.imshow(pivot, text_auto=True, color_continuous_scale="Blues",
+                        title="Severity vs Status Heatmap")
+        st.plotly_chart(fig, use_container_width=True)
 
     # ---- SUMMARY ----
-    st.subheader("Vulnerability Summary")
-    for _, row in counts.iterrows():
-        st.write(f"{row['Severity']}: {row['Count']}")
+    st.subheader("📌 Vulnerability Summary")
+    summary = df["severity"].value_counts().to_dict()
+    for sev, count in summary.items():
+        st.write(f"{sev}: {count}")
 
     # ---- PATCH SIMULATION ----
-    st.subheader("Simulate Patch")
+    st.subheader("🛠 Simulate Patch")
     vuln_indices = df[df["status"] == "Vulnerable"].index.tolist()
     if vuln_indices:
         selected = st.multiselect("Select rows to patch", vuln_indices)
         if st.button("Apply Patch"):
             df = apply_patch(df, selected)
-            st.success(f"Patched {len(selected)} row(s)")
+            st.success(f"✅ Patched {len(selected)} row(s)")
             st.dataframe(df, use_container_width=True)
 else:
-    st.info("Please upload a CSV file to continue.")
+    st.info("📥 Please upload a CSV file to continue.")
