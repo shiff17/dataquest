@@ -20,6 +20,9 @@ if page == "Homepage":
     if uploaded:
         df = pd.read_csv(uploaded)
 
+        # ❌ Drop software & version columns if they exist
+        df = df.drop(columns=[c for c in ["software", "version"] if c in df.columns])
+
         st.subheader("📌 Raw Data (Before Cleaning)")
         st.dataframe(df, use_container_width=True)
 
@@ -97,8 +100,6 @@ if page == "Homepage":
             after_counts.columns = ["Severity", "Count"]
             after_counts["Type"] = "After"
 
-            combined = pd.concat([before_counts, after_counts])
-
             col1, col2 = st.columns(2)
             with col1:
                 fig_before = px.bar(before_counts, x="Severity", y="Count",
@@ -134,6 +135,10 @@ elif page == "Analytics":
 
     if uploaded:
         df = pd.read_csv(uploaded)
+
+        # ❌ Drop software & version
+        df = df.drop(columns=[c for c in ["software", "version"] if c in df.columns])
+
         before_len = len(df)
         df = df.dropna()
         after_len = len(df)
@@ -211,6 +216,10 @@ elif page == "Visualization":
 
     if uploaded:
         df = pd.read_csv(uploaded)
+
+        # ❌ Drop software & version
+        df = df.drop(columns=[c for c in ["software", "version"] if c in df.columns])
+
         before_df = df.copy()
         before_len = len(df)
         df = df.dropna()
